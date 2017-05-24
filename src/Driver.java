@@ -9,9 +9,61 @@ public class Driver {
 	public final static Random r = new Random();
 
 	public static void main(String[] args) throws IOException {
-		String text = readFileToString(args[0]);
-		MarkovModel mm = getNGramModel(Integer.parseInt(args[1]), text);
-		System.out.print(mm.generateChain(Integer.parseInt(args[2])));
+		String text = "";
+		TextDivisor delimiter = null;
+		int n = 0;
+		int chainLen = 0;
+		for (int i = 0; i < args.length; i += 2) {
+			String next = args[i + 1];
+			switch (args[i]) {
+				case "-t":
+					File file = new File(next);
+					if (file.isDirectory()) {
+						StringBuilder sb = new StringBuilder();
+						File[] listOfFiles = file.listFiles();
+						for (File tempText : listOfFiles) {
+							sb.append(readFileToString(tempText.toString()));
+						}
+						text = sb.toString();
+					}
+					else {
+						text = readFileToString(next);
+					}
+					break;
+				case "-d":
+					switch(next) {
+						case "sentences":
+							delimiter = TextDivisor.SENTENCE_PUNCT;
+							break;
+					}
+					break;
+				case "-n":
+					n = Integer.parseInt(next);
+					break;
+				case "-c":
+					chainLen = Integer.parseInt(next);
+					break;
+				default:
+					printUsage();
+					System.exit(0);
+			}
+		}
+
+		System.out.println("Building Markov model");
+		MarkovModel mm = getNGramModel(n, text);
+
+		System.out.println("Generating Markov chain");
+		String chain = mm.generateChain(chainLen);
+		System.out.println(chain);
+
+		String[] sentences = chain.split("[.!?;:] ");
+		for (String s : sentences) {
+			System.out.println(s);
+		}
+	}
+
+	public static void printUsage() {
+		System.out.println("Usage: -t [text] -d [divisor] -n [order] -c [chain length]");
 	}
 
 	public static MarkovModel getNGramModel(int order, String text) {
@@ -129,6 +181,9 @@ public class Driver {
 //	}
 
 }
+
+
+
 
 
 

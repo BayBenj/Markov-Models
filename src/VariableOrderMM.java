@@ -4,7 +4,7 @@ import java.util.*;
 
 public class VariableOrderMM extends MarkovModel {
 
-	private Link transitions;
+	private MidLink transitions;
 	private Link priors;
 
 	public VariableOrderMM(int order, BiMap<Integer, Object> tokens, List<List<String>> nGrams, List<String> words) {
@@ -13,14 +13,14 @@ public class VariableOrderMM extends MarkovModel {
 		this.setTransitions(determineTransitions(nGrams, tokens, order));
 	}
 
-	public static Link determineTransitions(List<List<String>> nGrams, BiMap<Integer,Object> tokensAndIds, int order) {
-		Link result = new MidLink();
+	public static MidLink determineTransitions(List<List<String>> nGrams, BiMap<Integer,Object> tokensAndIds, int order) {
+		MidLink result = new MidLink();
 
 		List<String> nGram;
 		for (int i = 0; i < nGrams.size(); i++) {
 			nGram = nGrams.get(i);
 			LinkedList<Integer> ids = new LinkedList<>();
-			for (int j = 0; j < order; j++) {//TODO: if the nGram is not smaller than the order...
+			for (int j = 0; j < nGram.size(); j++) {
 				int tempId = tokensAndIds.inverse().get(nGram.get(j));
 				ids.add(tempId);
 			}
@@ -29,106 +29,56 @@ public class VariableOrderMM extends MarkovModel {
 		return result;
 	}
 
-//	public static Link determineTransitions(List<List<String>> nGrams, BiMap<Integer,Object> tokensAndIds, int order) {
-//		final double ONE = 1.0;
-//
-//		Map<Integer,Map<Integer,Map<Integer,Double>>> result = new HashMap<>();
-//
-//		List<String> nGram;
-//		for (int i = 0; i < nGrams.size(); i++) {
-//			nGram = nGrams.get(i);
-//			for (int j = 0; j < order; j++) {
-//				int tempId = tokensAndIds.inverse().get(nGram.get(j));
-//				if (result.containsKey(tempId)) {
-//
-//				}
-//			}
-//			int id1 = tokensAndIds.inverse().get(nGram.get(0));
-//			int id2 = tokensAndIds.inverse().get(nGram.get(1));
-//			int id3 = tokensAndIds.inverse().get(nGram.get(2));
-//			if (result.containsKey(id1)) {
-//				if (result.get(id1).containsKey(id2)) {
-//					if (result.get(id1).get(id2).containsKey(id3)) {
-//						result.get(id1).get(id2).put(id3, result.get(id1).get(id2).get(id3) + ONE);
-//					}
-//					else {
-//						result.get(id1).get(id2).put(id3, ONE);
-//					}
-//				}
-//				else {
-//					Map<Integer,Double> map3 = new HashMap<>();
-//					map3.put(id3, ONE);
-//					Map<Integer,Map<Integer,Double>> map2 = result.get(id1);
-//					map2.put(id2, map3);
-//					result.put(id1, map2);
-//				}
-//			}
-//			else {
-//				Map<Integer,Double> map3 = new HashMap<>();
-//				map3.put(id3, ONE);
-//				Map<Integer,Map<Integer,Double>> map2 = new HashMap<>();
-//				map2.put(id2, map3);
-//				result.put(id1, map2);
-//			}
-//		}
-//		return result;
-//	}
-
 	public static Link determinePriors(List<String> words, BiMap<Integer,Object> tokensAndIds, int order) {
 		Link endLink = new EndLink();
-		endLink.put(tokensAndIds.inverse().get(words.get(1)), 1.0);
-		Map<Integer,Object> lastMidLink = endLink;
+		endLink.put(tokensAndIds.inverse().get(words.get(order - 1)), 1.0);
+		Link lastMidLink = endLink;
 		Link midLink = new MidLink();
-		for (int j = 0; j < order; j++) {
-			midLink.put(tokensAndIds.inverse().get(words.get(order - j)), lastMidLink);
+		for (int j = 1; j < order; j++) {
+			midLink.put(tokensAndIds.inverse().get(words.get(order - 1 - j)), lastMidLink);
 			lastMidLink = midLink;
+			midLink = new MidLink();
 		}
-		return midLink;
+		return lastMidLink;
 	}
 
 	public String generateChain(int n) {
-		List<String> words = new ArrayList<>();
 		//start with an n-gram of order - 1 words
 		double total = this.getPriors().count();
-		double rnd = Driver.r.nextInt((int)total);
-		double cumulativeTotal = 0;
-		for (Map.Entry<Integer,Map<Integer,Double>> entry : this.getPriors().entrySet()) {
-			for (Map.Entry<Integer,Double> entry2 : entry.getValue().entrySet()) {
-				cumulativeTotal += entry2.getValue();
-				if (cumulativeTotal > rnd) {
-					words.add((String) (this.getTokens().get(entry.getKey())));
-					break;
-				}
-			}
-		}
+		double rndTarget = Driver.r.nextInt((int)total);
+		double cumulativeTotal = 0.0;
+		List<String> chain = this.getPriors().randomNgram(cumulativeTotal, rndTarget, getTokens(), new ArrayList<>());
 
 		for (int i = 0; i < n - (this.getOrder() - 1); i++) {
-			int i1 = this.getTokens().inverse().get(words.get(0 + i));
-			int i2 = this.getTokens().inverse().get(words.get(1 + i));
-			Map<Integer,Double> transitions = this.getTransitions().get(i1).get(i2);
+			LinkedList<Integer> ids = new LinkedList<>();
+			for (int j = 0; j < this.getOrder() - 1; j++) {
+				int tempId = this.getTokens().inverse().get(chain.get(i + j));
+				ids.add(tempId);
+			}
+			Map<Integer,Double> transitions = this.getTransitions().getEndLink(ids);
 			cumulativeTotal = 0;
 			total = 0;
 			for (Map.Entry<Integer,Double> entry : transitions.entrySet()) {
 				total += entry.getValue();
 			}
-			rnd = Driver.r.nextInt((int)total);
+			rndTarget = Driver.r.nextInt((int)total);
 
 			for (Map.Entry<Integer,Double> entry : transitions.entrySet()) {
 				cumulativeTotal += entry.getValue();
-				if (cumulativeTotal > rnd) {
-					words.add((String)(this.getTokens().get(entry.getKey())));
+				if (cumulativeTotal > rndTarget) {
+					chain.add((String)(this.getTokens().get(entry.getKey())));
 					break;
 				}
 			}
 		}
-		return chainToString(words);
+		return chainToString(chain);
 	}
 
-	public Link getTransitions() {
+	public MidLink getTransitions() {
 		return transitions;
 	}
 
-	public void setTransitions(Link transitions) {
+	public void setTransitions(MidLink transitions) {
 		this.transitions = transitions;
 	}
 
@@ -140,5 +90,10 @@ public class VariableOrderMM extends MarkovModel {
 		this.priors = priors;
 	}
 }
+
+
+
+
+
 
 

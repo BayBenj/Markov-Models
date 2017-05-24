@@ -1,7 +1,5 @@
 
 public enum TextDivisor {
-
-	NO_DIVISSION,
+	NO_DIVISION,
 	SENTENCE_PUNCT,
-
 }

@@ -16,17 +16,24 @@ public class EndLink extends Link<Double> {
 	}
 
 	public int count() {
-		return 1;
+		return this.size();
 	}
 
-	public int randomNgram(double cumulativeTotal, double rndTarget, BiMap<Integer, Object> tokens, List<String> words) {
+	public List<String> randomNgram(Double cumulativeTotal, double rndTarget, BiMap<Integer, Object> tokens, List<String> chain) {
 		for (Map.Entry<Integer,Double> entry : this.entrySet()) {
 			cumulativeTotal += entry.getKey();
 			if (cumulativeTotal > rndTarget) {
-				words.add((String) (tokens.get(entry.getKey())));
+				chain.add((String) (tokens.get(entry.getKey())));
 				break;
 			}
 		}
+		return chain;
 	}
+
+//	public List<String> getChain(int lastId, BiMap<Integer, Object> tokens) {
+//		List<String> chain = new ArrayList<>();
+//		chain.add((String)tokens.get(this.get(lastId)));
+//
+//	}
 
 }

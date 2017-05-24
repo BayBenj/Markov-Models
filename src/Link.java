@@ -10,6 +10,6 @@ public abstract class Link<T> extends HashMap<Integer,T> {
 
 	public abstract int count();
 
-	public abstract int randomNgram(double cumulativeTotal, double rndTarget, BiMap<Integer, Object> tokens, List<String> words);
+	public abstract List<String> randomNgram(Double cumulativeTotal, double rndTarget, BiMap<Integer, Object> tokens, List<String> chain);
 
 }
