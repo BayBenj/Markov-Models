@@ -1,28 +1,33 @@
 import com.google.common.collect.BiMap;
+import javafx.util.Pair;
+
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 public class MidLink extends Link<Link> {
-	public void putNgram(LinkedList<Integer> ids) {
-		int firstId = ids.pop();
-		if (this.containsKey(firstId)) {
-			this.get(firstId).putNgram(ids);
+	public void putNgram(LinkedList<Pair<Integer,Double>> idsAndWeights) {
+		try {
+			int firstId = idsAndWeights.pop().getKey();
+			if (this.containsKey(firstId)) {
+				this.get(firstId).putNgram(idsAndWeights);
+			} else {
+				Link temp = null;
+				if (idsAndWeights.size() == 1) {
+					temp = new EndLink();
+				} else if (idsAndWeights.size() > 1) {
+					temp = new MidLink();
+				}
+				temp.putNgram(idsAndWeights);
+				this.put(firstId, temp);
+			}
 		}
-		else {
-			Link temp = null;
-			if (ids.size() == 1) {
-				temp = new EndLink();
-			}
-			else if (ids.size() > 1) {
-				temp = new MidLink();
-			}
-			temp.putNgram(ids);
-			this.put(firstId, temp);
+		catch (NullPointerException e) {
+			e.printStackTrace();
 		}
 	}
 
-	public int count() {
+	public double count() {
 		int result = 0;
 		for (Map.Entry<Integer,Link> entry : this.entrySet()) {
 			Link temp = entry.getValue();
@@ -70,6 +75,9 @@ public class MidLink extends Link<Link> {
 	}
 
 }
+
+
+
 
 
 

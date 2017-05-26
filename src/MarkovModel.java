@@ -1,4 +1,5 @@
 import com.google.common.collect.BiMap;
+import javafx.util.Pair;
 
 import java.util.List;
 
@@ -6,9 +7,9 @@ public abstract class MarkovModel {
 
 	private int order;
 	private BiMap<Integer,Object> tokens;//all possible tokens and their id
-	private List<List<String>> nGrams;
+	private List<Pair<String[], Double>> nGrams;
 
-	public MarkovModel(int order, BiMap<Integer, Object> tokens, List<List<String>> nGrams) {
+	public MarkovModel(int order, BiMap<Integer, Object> tokens, List<Pair<String[], Double>> nGrams) {
 		this.setOrder(order);
 		this.setTokens(tokens);
 		this.setnGrams(nGrams);
@@ -41,11 +42,11 @@ public abstract class MarkovModel {
 		this.order = order;
 	}
 
-	public List<List<String>> getnGrams() {
+	public List<Pair<String[], Double>> getnGrams() {
 		return nGrams;
 	}
 
-	public void setnGrams(List<List<String>> nGrams) {
+	public void setnGrams(List<Pair<String[], Double>> nGrams) {
 		this.nGrams = nGrams;
 	}
 }

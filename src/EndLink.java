@@ -1,22 +1,34 @@
 import com.google.common.collect.BiMap;
+import javafx.util.Pair;
 
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 public class EndLink extends Link<Double> {
-	public void putNgram(LinkedList<Integer> ids) {
-		int firstId = ids.pop();
-		if (this.containsKey(firstId)) {
-			this.put(firstId, this.get(firstId) + 1.0);
-		}
-		else {
-			this.put(firstId, 1.0);
-		}
+	public void putNgram(LinkedList<Pair<Integer,Double>> idsAndWeights) {
+		Pair<Integer,Double> first = idsAndWeights.pop();
+//		try {
+			int firstId = first.getKey();
+			double firstWeight = first.getValue();
+			if (this.containsKey(firstId)) {
+				this.put(firstId, this.get(firstId) + firstWeight);
+			}
+			else {
+				this.put(firstId, firstWeight);
+			}
+//		}
+//		catch (NullPointerException e) {
+//			e.printStackTrace();
+//		}
 	}
 
-	public int count() {
-		return this.size();
+	public double count() {
+		double total = 0;
+		for (Map.Entry<Integer,Double> entry : this.entrySet()) {
+			total += entry.getValue();
+		}
+		return total;
 	}
 
 	public List<String> randomNgram(Double cumulativeTotal, double rndTarget, BiMap<Integer, Object> tokens, List<String> chain) {

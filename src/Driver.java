@@ -1,16 +1,19 @@
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import javafx.util.Pair;
 
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Driver {
 
 	public final static Random r = new Random();
 
 	public static void main(String[] args) throws IOException {
-		String text = "";
 		TextDivisor delimiter = null;
+		Map<String,Double> texts = new HashMap<>();
 		int n = 0;
 		int chainLen = 0;
 		for (int i = 0; i < args.length; i += 2) {
@@ -19,15 +22,25 @@ public class Driver {
 				case "-t":
 					File file = new File(next);
 					if (file.isDirectory()) {
-						StringBuilder sb = new StringBuilder();
 						File[] listOfFiles = file.listFiles();
-						for (File tempText : listOfFiles) {
-							sb.append(readFileToString(tempText.toString()));
+						for (File tempFile : listOfFiles) {
+							if (!tempFile.getName().endsWith(".txt")) continue;
+							String tempText = readFileToString(tempFile.toString());
+							Pattern pattern = Pattern.compile("<WEIGHT: \\d+.\\d+>");
+							Matcher matcher = pattern.matcher(tempText);
+							double tempWeight = 1.0;
+							if (matcher.find()) {
+								String w = matcher.toMatchResult().group();
+								w = w.replace(">","");
+								w = w.substring(9);
+								tempWeight = Double.parseDouble(w);
+							}
+							tempText = tempText.replace(matcher.toMatchResult().group() + "\n","");
+							texts.put(tempText, tempWeight);
 						}
-						text = sb.toString();
 					}
 					else {
-						text = readFileToString(next);
+						texts.put(readFileToString(file.toString()),1.0);
 					}
 					break;
 				case "-d":
@@ -50,7 +63,7 @@ public class Driver {
 		}
 
 		System.out.println("Building Markov model");
-		MarkovModel mm = getNGramModel(n, text);
+		MarkovModel mm = getNGramModel(n, texts);
 
 		System.out.println("Generating Markov chain");
 		String chain = mm.generateChain(chainLen);
@@ -66,31 +79,52 @@ public class Driver {
 		System.out.println("Usage: -t [text] -d [divisor] -n [order] -c [chain length]");
 	}
 
-	public static MarkovModel getNGramModel(int order, String text) {
-		String[] words = text.split("\\s");
+	public static MarkovModel getNGramModel(int order, Map<String,Double> texts) {
+		List<Pair<String[], Double>> allNgrams= new ArrayList<>();
+		BiMap<Integer,Object> allTokensAndIds = HashBiMap.create();
+		List<String> allWords = new ArrayList<>();
+		int i = 0;
+		for (Map.Entry<String,Double> text : texts.entrySet()) {
+			String cleanedText = cleanText(text.getKey());
+			String tokenizedText = addTokens(cleanedText, order);
+			String[] words = tokenizedText.split("\\s");
+			allWords.addAll(Arrays.asList(words));
+			Set<Object> tokens = new HashSet<>(Arrays.asList(words));
 
-		//separate words into nGrams of n words
-		List<List<String>> nGrams = getNGrams(Arrays.asList(words), order);
+			Set<Object> tempTokens = getTokenIdMap(tokens);
+			for (Object tempToken : tempTokens) {
+				if (allTokensAndIds.containsValue(tempToken)) continue;
+				allTokensAndIds.put(i, tempToken);
+				i++;
+			}
 
-		Set<Object> tokens = new HashSet<>(Arrays.asList(words));
-		BiMap<Integer,Object> tokensAndIds = getTokenIdMap(tokens);
-
-		return getNGram(order, nGrams, tokensAndIds, Arrays.asList(words));
+			//separate words into nGrams of n words
+			List<Pair<String, Double>> weightedWords = new ArrayList<>();
+			for (String s : words) {
+				weightedWords.add(new Pair<>(s,text.getValue()));
+			}
+			List<Pair<String[], Double>> nGrams = getNGrams(weightedWords, order);
+			allNgrams.addAll(nGrams);
+		}
+		return getMarkovModel(order, allNgrams, allTokensAndIds, allWords);
 	}
 
-	public static List<List<String>> getNGrams(List<String> words, int order) {
-		List<String> tempUnit = new ArrayList<>();
-		List<List<String>> nGrams = new ArrayList<>();
+	public static List<Pair<String[], Double>> getNGrams(List<Pair<String,Double>> words, int order) {
+		String[] tempNGram = new String[order];
+		List<Pair<String[], Double>> nGrams = new ArrayList<>();
 		for (int i = 0; i < words.size(); i++) {
+			double tempWeight = 1.0;
 			for (int j = 0; j < order; j++) {
-				if (i + j < words.size() && !words.get(i + j).equals("")) {
-					tempUnit.add(words.get(i + j));
+				if (i + j < words.size() && !words.get(i + j).getKey().equals("")) {
+					if (j < order - 1 && words.get(i + j).getKey().equals("<e>")) break;
+					tempNGram[j] = (words.get(i + j).getKey());
+					tempWeight = words.get(i + j).getValue();
 				}
 			}
-			if (tempUnit.size() == order) {
-				nGrams.add(tempUnit);
-				tempUnit = new ArrayList<>();
+			if (tempNGram.length == order && tempNGram[order - 1] != null && tempNGram[0] != null) {
+				nGrams.add(new Pair<>(tempNGram, tempWeight));
 			}
+			tempNGram = new String[order];
 		}
 		return nGrams;
 	}
@@ -107,15 +141,14 @@ public class Driver {
 		return fileAsString;
 	}
 
-	public static BiMap<Integer,Object> getTokenIdMap(Set<Object> tokens) {
-		BiMap<Integer,Object> tokensField = HashBiMap.create();
-		int i = 0;
+	public static Set<Object> getTokenIdMap(Set<Object> tokens) {
+		Set<Object> tokensField = new HashSet<>();
 		for (Object o : tokens) {
 			if (o.equals("")) {
+				System.out.println("skipped empty string!");
 				continue;
 			}
-			tokensField.put(i,o);
-			i++;
+			tokensField.add(o);
 		}
 		return tokensField;
 	}
@@ -129,7 +162,7 @@ public class Driver {
 //		return priors;
 //	}
 
-	public static MarkovModel getNGram(int order, List<List<String>> nGrams, BiMap<Integer,Object> tokensAndIds, List<String> words) {
+	public static MarkovModel getMarkovModel(int order, List<Pair<String[], Double>> nGrams, BiMap<Integer,Object> tokensAndIds, List<String> words) {
 		MarkovModel mm;
 		switch (order) {
 			case 1:
@@ -148,6 +181,37 @@ public class Driver {
 //			case 5: return _5Gram(nGrams, tokensAndIds, words);
 //			default: return null;
 //		}
+	}
+
+	public static String cleanText(String text) {
+		text = text.replaceAll("\"", "");
+		text = text.replaceAll("\\(", "");
+		text = text.replaceAll("\\)", "");
+		return text;
+	}
+
+	public static String addTokens(String text, int order) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < order - 1; i++) {
+			if (i == 0) {
+				sb.append(" <s> ");
+			}
+			else {
+				sb.append("<s> ");
+			}
+		}
+		String endToken = " <e>";
+		String startTokens = sb.toString();
+		String tokens = endToken + startTokens;
+		sb = new StringBuilder(text);
+		sb.insert(0,startTokens);
+		text = sb.toString();
+		text = text.replaceAll("\\.\\s", "." + tokens);
+		text = text.replaceAll("\\?\\s", "?" + tokens);
+		text = text.replaceAll("!\\s", "!" + tokens);
+		text = text.replaceAll(";\\s", ";" + tokens);
+		text = text.replaceAll(":\\s", ":" + tokens);
+		return text;
 	}
 
 //	public static MM1Gram _1Gram(List<List<String>> _1Grams, BiMap<Integer,Object> tokensAndIds) {
@@ -181,6 +245,7 @@ public class Driver {
 //	}
 
 }
+
 
 
 
